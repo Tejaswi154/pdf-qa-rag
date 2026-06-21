@@ -3,7 +3,8 @@ groq
 langchain
 langchain-community
 langchain-text-splitters
-chromadb
+chromadb==0.5.23
+protobuf==4.25.5
 sentence-transformers
 pypdf
 rank-bm25
