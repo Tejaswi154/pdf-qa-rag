@@ -1,0 +1,7 @@
+import streamlit as st
+from sentence_transformers import CrossEncoder
+
+
+@st.cache_resource
+def get_reranker():
+    return CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
