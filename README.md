@@ -1,32 +1,44 @@
 # PDF Q&A — Agentic RAG (Streamlit + Groq)
 
-Interactive web app version of the Repo Whisperer RAG pipeline. Upload a
-PDF, ask questions, get cited answers — powered by the same agentic
-pipeline (router → rewrite → decompose → multi-query → hybrid BM25+vector
-retrieval → rerank → evidence check → answer → self-verify/correct), just
-swapped from local Ollama to Groq's free hosted API so it can run on free
-hosting.
+Upload a PDF, ask questions, get answers grounded only in that document —
+with page citations. Built on an agentic RAG pipeline: router → query
+rewrite → decomposition → multi-query expansion → hybrid BM25 + vector
+retrieval → reranking → evidence check → answer generation → grounding
+verification.
 
-## What changed vs. the local notebook/CLI version
+Runs on Groq's free hosted LLM API, so it can be deployed for free with no
+local GPU or model server needed.
 
-- **LLM**: `ollama.chat()` → Groq's hosted API (`llama-3.1-8b-instant`),
-  via `llm.py`. Free tier, no local GPU/daemon needed.
-- **PDF source**: hardcoded file path → user upload in the browser.
-- **Interface**: `input()` loop in a terminal → Streamlit chat UI.
-- **Models**: embeddings (`bge-small-en-v1.5`) and reranker
-  (`ms-marco-MiniLM-L-6-v2`) are cached with `st.cache_resource` so they
-  download once per server, not once per user.
-- **Everything else** (router, rewrite, decompose, multi-query, hybrid
-  retrieval, rerank, evidence-check fallback, self-correction) is the same
-  logic as the original pipeline, just refactored into one function call
-  per question instead of a `while True` loop.
+## How it works
+
+1. You upload a PDF and click **Ask** to build the index (chunking, BM25
+   keyword index, vector embeddings, reranker — all in memory, per
+   session).
+2. Each question goes through:
+   - **Router** — decides if you're asking for a summary, asking about
+     chat history, asking something unrelated to the document, or asking
+     a real question about it.
+   - **Rewrite + decomposition** — turns your question into one or more
+     standalone search queries.
+   - **Hybrid retrieval** — pulls candidate chunks via both keyword (BM25)
+     and semantic (vector) search.
+   - **Reranking** — scores chunks against each sub-question, with a fair
+     allocation so a multi-part question doesn't let one part starve out
+     another.
+   - **Evidence check** — if the first pass doesn't have enough context,
+     it does a broader fallback retrieval before answering.
+   - **Answer generation** — answers only from the retrieved document
+     context, citing source pages.
+   - **Grounding check** — independently verifies the generated answer
+     didn't add anything not actually in the document (catches the model
+     padding a refusal with invented suggestions).
 
 ## Files
 
 ```
-repo_whisperer_app/
+.
 ├── app.py             # Streamlit UI — upload, build index, chat
-├── llm.py             # Groq chat wrapper (drop-in replacement for ollama.chat)
+├── llm.py             # Groq chat wrapper (per-user API key, no server-side caching of keys)
 ├── loader.py           # PDF loading from an uploaded file
 ├── summarizer.py        # document summary (used by the SUMMARY route)
 ├── chunker.py          # RecursiveCharacterTextSplitter
@@ -40,65 +52,31 @@ repo_whisperer_app/
     └── secrets.toml.example
 ```
 
-## 1. Get a free Groq API key
+## Bring your own Groq key
 
-Go to **[console.groq.com](https://console.groq.com)** → sign up (no
-credit card) → API Keys → Create key. Free tier as of now: 30
-requests/minute, 6,000 tokens/minute — plenty for a few people testing the
-app.
+This app does **not** ship with a built-in API key. Every user — including
+you — pastes their own free Groq key into the sidebar each time they use
+it. Nothing is stored server-side; the key lives only in that browser's
+session. This keeps usage and free-tier rate limits separate per person,
+and means no one's API spend is shared with anyone else.
 
-## 2. Run locally first (recommended)
+Get a free key at **[console.groq.com](https://console.groq.com)** → sign
+up (no credit card) → API Keys → Create key. Free tier: 30 requests/min,
+6,000 tokens/min — fine for casual use by one person at a time.
+
+## Run locally
 
 ```bash
-cd repo_whisperer_app
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-It'll open in your browser. Paste your Groq key into the sidebar field, or
-put it in `.streamlit/secrets.toml` (copy `secrets.toml.example`, fill in
-your key, rename to `secrets.toml` — it's git-ignored).
+It opens in your browser. Paste your Groq key into the sidebar, upload a
+PDF, click **Ask** to build the index, then ask questions in the chat box.
 
-## 3. Deploy free on Streamlit Community Cloud
+(`.streamlit/secrets.toml.example` exists only as a template if you ever
+want a local default key for your own testing — copy it to
+`secrets.toml` and fill it in. It's git-ignored, so it never gets
+committed or pushed.)
 
-1. Push this folder to a **public GitHub repo** (e.g. `repo-whisperer-rag`).
-   Make sure `.streamlit/secrets.toml` is NOT committed (it's in
-   `.gitignore` already) — only commit `secrets.toml.example`.
-2. Go to **[share.streamlit.io](https://share.streamlit.io)**, sign in with
-   GitHub.
-3. Click **"New app"**, pick your repo, branch `main`, main file path
-   `app.py` (adjust if you nested the folder).
-4. Before deploying (or after, in app settings), go to **Settings → Secrets**
-   and paste:
-   ```toml
-   GROQ_API_KEY = "gsk_your_real_key_here"
-   ```
-   This way your friends don't need their own key — they just open the link.
-5. Click **Deploy**. First build takes a few minutes (downloading
-   embedding/reranker model weights). After that, share the
-   `https://your-app-name.streamlit.app` link with anyone.
 
-### If you'd rather each friend bring their own key
-
-Skip step 4. Leave the sidebar's "Groq API key" field for users to paste
-their own key into — nothing is stored server-side, it only lives in their
-browser session.
-
-## Notes / limits to expect
-
-- **Free tier RAM** on Streamlit Community Cloud is limited (~1GB). The
-  embedding + reranker models are small (~100-300MB combined) so this
-  should fit, but very large PDFs (100+ pages) may be slow on first index.
-- **Each user's index is in-memory only** (Chroma with no persistent
-  directory) and tied to their session — refreshing the page means
-  re-uploading and re-building the index. This is intentional: it keeps
-  things simple and avoids one user's PDF being visible to another.
-- **Groq free-tier rate limits** (30 req/min, 6k tokens/min) — the
-  pipeline makes several LLM calls per question (router, rewrite, planner,
-  decomposition, multi-query, evidence check, answer, verify, possibly
-  self-correct), so under heavy concurrent use from multiple friends you
-  may hit 429 rate-limit errors. The app surfaces these as an error message
-  rather than crashing.
-- If you want a stronger model, change `MODEL_MAP` in `llm.py` to map to
-  `"llama-3.3-70b-versatile"` instead of `"llama-3.1-8b-instant"` (slower,
-  better quality, still free tier).
