@@ -79,35 +79,3 @@ want a local default key for your own testing — copy it to
 `secrets.toml` and fill it in. It's git-ignored, so it never gets
 committed or pushed.)
 
-## Deploy free on Streamlit Community Cloud
-
-1. Push this repo to **GitHub** (public).
-2. Go to **[share.streamlit.io](https://share.streamlit.io)**, sign in
-   with GitHub.
-3. Click **"New app"** → pick this repo → branch `main` → main file path
-   `app.py`.
-4. Click **Deploy**. Leave **Settings → Secrets** empty — this app is
-   bring-your-own-key by design, so there's nothing to add there.
-5. First build takes a few minutes (downloading the embedding + reranker
-   model weights). After that, share the
-   `https://your-app-name.streamlit.app` link with anyone — they'll each
-   paste their own Groq key to use it.
-
-## Known limits
-
-- **Free tier RAM** on Streamlit Community Cloud is limited (~1GB). The
-  embedding + reranker models are small enough to fit, but very large
-  PDFs (100+ pages) may be slow to index on first run.
-- **Each session's index is in-memory only**, tied to that browser tab.
-  Refreshing the page means re-uploading and re-building the index. This
-  is intentional — it keeps one user's PDF from ever being visible to
-  another.
-- **Per-question LLM call count is high** — router, rewrite, planner,
-  decomposition, multi-query, evidence check, answer, verify, and a
-  grounding check, plus possible self-correction and fallback retries.
-  Expect 8-12+ Groq calls per question. On the free tier (30 req/min) this
-  is fine for one person, but can hit rate limits under heavy concurrent
-  use.
-- Want a stronger model? Edit `MODEL_MAP` in `llm.py` to map to
-  `"llama-3.3-70b-versatile"` instead of `"llama-3.1-8b-instant"` — slower
-  but more capable, still free tier.
