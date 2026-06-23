@@ -3,7 +3,7 @@ groq
 langchain
 langchain-community
 langchain-text-splitters
-chromadb==0.5.23
+faiss-cpu
 protobuf==4.25.5
 sentence-transformers
 pypdf
