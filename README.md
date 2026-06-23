@@ -1,82 +1,159 @@
-# PDF Q&A — Agentic RAG (Streamlit + Groq)
+# PDF Q&A — Agentic Retrieval-Augmented Generation System
 
-Upload a PDF, ask questions, get answers grounded only in that document —
-with page citations. Built on an agentic RAG pipeline: router → query
-rewrite → decomposition → multi-query expansion → hybrid BM25 + vector
-retrieval → reranking → evidence check → answer generation → grounding
-verification.
+An intelligent document question-answering platform that enables users to interact with PDF documents using natural language. The system combines hybrid retrieval, query planning, reranking, evidence validation, and grounded answer generation to produce accurate, citation-backed responses.
 
-Runs on Groq's free hosted LLM API, so it can be deployed for free with no
-local GPU or model server needed.
+Built using a multi-stage Agentic RAG architecture with BM25 retrieval, dense vector search, Cross-Encoder reranking, and Groq-hosted LLM inference.
 
-## How it works
+---
 
-1. You upload a PDF and click **Ask** to build the index (chunking, BM25
-   keyword index, vector embeddings, reranker — all in memory, per
-   session).
-2. Each question goes through:
-   - **Router** — decides if you're asking for a summary, asking about
-     chat history, asking something unrelated to the document, or asking
-     a real question about it.
-   - **Rewrite + decomposition** — turns your question into one or more
-     standalone search queries.
-   - **Hybrid retrieval** — pulls candidate chunks via both keyword (BM25)
-     and semantic (vector) search.
-   - **Reranking** — scores chunks against each sub-question, with a fair
-     allocation so a multi-part question doesn't let one part starve out
-     another.
-   - **Evidence check** — if the first pass doesn't have enough context,
-     it does a broader fallback retrieval before answering.
-   - **Answer generation** — answers only from the retrieved document
-     context, citing source pages.
-   - **Grounding check** — independently verifies the generated answer
-     didn't add anything not actually in the document (catches the model
-     padding a refusal with invented suggestions).
+## Key Capabilities
 
-## Files
+* Natural language question answering over PDF documents
+* Hybrid retrieval using BM25 and dense vector search
+* Query rewriting and decomposition for complex questions
+* Multi-query retrieval for improved recall
+* Cross-Encoder reranking for relevance optimization
+* Evidence sufficiency validation with fallback retrieval
+* Grounded answer generation with source citations
+* Conversation-aware interactions
+* Document summarization
+* Cloud-deployable architecture with user-managed API authentication
 
-```
-.
-├── app.py             # Streamlit UI — upload, build index, chat
-├── llm.py             # Groq chat wrapper (per-user API key, no server-side caching of keys)
-├── loader.py           # PDF loading from an uploaded file
-├── summarizer.py        # document summary (used by the SUMMARY route)
-├── chunker.py          # RecursiveCharacterTextSplitter
-├── bm25_search.py        # BM25 keyword index
-├── vector_store.py        # HuggingFace embeddings + Chroma vector store
-├── reranker.py          # CrossEncoder reranker
-├── qa_pipeline.py        # the full agentic pipeline, one call per question
-├── requirements.txt
-├── .gitignore
-└── .streamlit/
-    └── secrets.toml.example
-```
+---
 
-## Bring your own Groq key
+## System Architecture
 
-This app does **not** ship with a built-in API key. Every user — including
-you — pastes their own free Groq key into the sidebar each time they use
-it. Nothing is stored server-side; the key lives only in that browser's
-session. This keeps usage and free-tier rate limits separate per person,
-and means no one's API spend is shared with anyone else.
-
-Get a free key at **[console.groq.com](https://console.groq.com)** → sign
-up (no credit card) → API Keys → Create key. Free tier: 30 requests/min,
-6,000 tokens/min — fine for casual use by one person at a time.
-
-## Run locally
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
+```text
+PDF Upload
+    ↓
+Document Parsing
+    ↓
+Chunking
+    ↓
+Index Construction
+ ┌─────────────┬─────────────┐
+ │    BM25     │    FAISS    │
+ └─────────────┴─────────────┘
+    ↓
+Agentic Query Pipeline
+    ↓
+Query Rewriting
+    ↓
+Question Decomposition
+    ↓
+Multi-Query Expansion
+    ↓
+Hybrid Retrieval
+    ↓
+Cross-Encoder Reranking
+    ↓
+Evidence Validation
+    ↓
+LLM Answer Generation
+    ↓
+Grounding Verification
+    ↓
+Answer + Citations
 ```
 
-It opens in your browser. Paste your Groq key into the sidebar, upload a
-PDF, click **Ask** to build the index, then ask questions in the chat box.
+---
 
-(`.streamlit/secrets.toml.example` exists only as a template if you ever
-want a local default key for your own testing — copy it to
-`secrets.toml` and fill it in. It's git-ignored, so it never gets
-committed or pushed.)
+## Retrieval Pipeline
 
+### Query Planning
 
+User questions are rewritten into standalone retrieval-friendly queries. Complex requests are decomposed into smaller sub-questions to improve retrieval quality and coverage.
+
+### Hybrid Search
+
+The retrieval layer combines:
+
+* BM25 keyword retrieval
+* Dense semantic retrieval using FAISS and Sentence Transformers
+
+This approach improves both lexical matching and semantic understanding.
+
+### Relevance Optimization
+
+Retrieved candidates are rescored using a Cross-Encoder reranker, ensuring that the most relevant evidence is selected before answer generation.
+
+### Evidence Validation
+
+The system evaluates whether sufficient supporting evidence exists before generating an answer. When evidence is weak, broader retrieval is automatically triggered.
+
+### Grounding Verification
+
+Generated responses are independently verified against retrieved evidence to reduce unsupported claims and hallucinations.
+
+---
+
+## Technology Stack
+
+### LLM Layer
+
+* Groq API
+* Llama 3.1 8B Instant
+
+### Retrieval Layer
+
+* BM25
+* FAISS
+* Sentence Transformers
+
+### Ranking Layer
+
+* CrossEncoder Reranking
+
+### Frameworks
+
+* LangChain
+* Streamlit
+
+### Document Processing
+
+* PyPDF
+* Recursive Character Text Splitting
+
+---
+
+## Project Structure
+
+```text
+app.py              # Streamlit application
+qa_pipeline.py      # Agentic RAG orchestration
+llm.py              # Groq integration layer
+loader.py           # PDF ingestion
+chunker.py          # Document chunking
+bm25_search.py      # Sparse retrieval
+vector_store.py     # Dense retrieval (FAISS)
+reranker.py         # Cross-Encoder ranking
+summarizer.py       # Document summarization
+```
+
+---
+
+## Deployment
+
+The application is designed for cloud deployment and supports user-provided Groq API keys, allowing public access without centralized API cost management.
+
+---
+
+## Example Use Cases
+
+* Enterprise document search
+* Research paper analysis
+* Technical documentation assistants
+* Knowledge management systems
+* Regulatory and compliance document review
+* Internal organizational knowledge retrieval
+
+---
+
+## Highlights
+
+* End-to-end Agentic RAG implementation
+* Hybrid retrieval architecture
+* Multi-stage relevance optimization
+* Grounded answer generation
+* Cloud-native deployment model
+* Citation-backed responses
