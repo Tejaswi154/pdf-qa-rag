@@ -45,3 +45,19 @@ def chat(model, messages):
             "content": completion.choices[0].message.content
         }
     }
+
+
+def validate_api_key(api_key):
+    try:
+        client = Groq(api_key=api_key)
+
+        client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+        )
+
+        return True
+
+    except Exception:
+        return False
