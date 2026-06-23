@@ -7,10 +7,11 @@ from bm25_search import build_bm25
 from vector_store import get_embeddings, build_vector_db
 from reranker import get_reranker
 from qa_pipeline import answer_question
+from llm import validate_api_key
 
 st.set_page_config(page_title="PDF Q&A", page_icon="📄", layout="wide")
 
-st.title("📄 Upload a PDF, then ask questions.")
+st.title("📄 Upload a PDF, then ask questions")
 
 # ---------- Sidebar: API key + PDF upload ----------
 with st.sidebar:
@@ -35,7 +36,11 @@ with st.sidebar:
 
     uploaded_file = st.file_uploader("Upload a PDF", type=["pdf"])
 
-    build_clicked = st.button("Ask", type="primary", disabled=uploaded_file is None)
+    build_clicked = st.button(
+    "Process PDF",
+    type="primary",
+    disabled=uploaded_file is None
+    )
 
     st.divider()
     if st.button("🗑️ Reset conversation"):
@@ -56,12 +61,23 @@ for key, default in [
         st.session_state[key] = default
 
 # ---------- Build the index ----------
-if build_clicked and uploaded_file is not None:
-    if not st.session_state["groq_api_key"]:
-        st.sidebar.error("Add a Groq API key first (console.groq.com — free).")
-    else:
-        with st.spinner("Reading PDF..."):
-            documents = load_pdf(uploaded_file)
+if build_clicked:
+    api_key = st.session_state.get("groq_api_key", "")
+    if not api_key:
+        st.error("Please enter your Groq API key.")
+        st.stop()
+
+    if not validate_api_key(api_key):
+        st.error("Invalid Groq API key.")
+        st.stop()
+
+    if uploaded_file is None:
+        st.error("Please upload a PDF.")
+        st.stop()
+
+    
+    with st.spinner("Reading PDF..."):
+        documents = load_pdf(uploaded_file)
 
         with st.spinner("Summarizing document..."):
             full_text = get_full_text(documents)
@@ -89,7 +105,7 @@ if build_clicked and uploaded_file is not None:
 
 # ---------- Main area ----------
 if not st.session_state["pipeline_ready"]:
-    st.info("👈 Upload a PDF and click **Ask** to get started. You'll need a free Groq API key from [console.groq.com](https://console.groq.com).")
+    st.info("👈 Upload a PDF, enter your Groq API key, and click **Process PDF** to get started. You'll need a free Groq API key from [console.groq.com](https://console.groq.com).")
     st.stop()
 
 st.success(f"Ready — chatting with **{st.session_state['doc_name']}**")
